@@ -25,5 +25,7 @@ def load_metadata() -> ModelMetadata:
     )
 
 
-FACE_EMBEDDING_MODEL_PATH = os.getenv("FACE_EMBEDDING_MODEL_PATH")
+DEFAULT_MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "face_embedding.tflite")
+FACE_EMBEDDING_MODEL_PATH = os.getenv("FACE_EMBEDDING_MODEL_PATH", DEFAULT_MODEL_PATH if os.path.exists(DEFAULT_MODEL_PATH) else None)
 MOCK_MODEL_ENABLED = os.getenv("MOCK_MODEL_ENABLED", "false").lower() == "true"
+
