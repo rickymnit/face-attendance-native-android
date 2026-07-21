@@ -53,3 +53,7 @@ Thumbs.db
 
 # Local backup of nested repositories moved before creating the master repo
 .git-backups/
+
+# ML Models
+!*.tflite
+

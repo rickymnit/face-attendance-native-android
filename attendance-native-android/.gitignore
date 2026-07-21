@@ -13,3 +13,7 @@ captures/
 
 app/build/
 app/schemas/
+
+# ML Models
+!*.tflite
+
