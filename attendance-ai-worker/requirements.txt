@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pillow==11.0.0
+pytest==8.3.4
+httpx==0.28.1
+
+numpy==2.0.2
+# Install one runtime matching FACE_EMBEDDING_MODEL_PATH when running real models.
+# onnxruntime==1.18.1
+# tflite-runtime is platform-specific; install a compatible wheel for the deployment device/image.
+opencv-python-headless==4.10.0.84

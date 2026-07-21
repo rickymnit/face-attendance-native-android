@@ -1,0 +1,401 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SchoolStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum DeviceStatus {
+  ACTIVE
+  DISABLED
+  UNBOUND
+}
+
+enum StudentStatus {
+  ACTIVE
+  INACTIVE
+  DELETED
+}
+
+enum EmbeddingStatus {
+  ACTIVE
+  PENDING_APPROVAL
+  DELETED
+}
+
+enum AttendanceEventType {
+  PRESENT
+  LATE
+  HALF_DAY
+  OUT
+}
+
+enum SyncStatus {
+  PENDING
+  ACCEPTED
+  SYNCED_TO_ERP
+  FAILED
+  DUPLICATE
+}
+
+enum ErpSyncState {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum EnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ImportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
+}
+
+enum ImportJobItemStatus {
+  PENDING
+  VALIDATED
+  FAILED
+  EMBEDDING_PENDING
+  EMBEDDING_DONE
+  EMBEDDING_FAILED
+}
+
+enum EmbeddingJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AuditAction {
+  DEVICE_REGISTERED
+  DEVICE_HEARTBEAT
+  ATTENDANCE_SYNCED
+  FAILED_RECOGNITION_SYNCED
+  ENROLLMENT_REQUESTED
+  EMBEDDING_DELTA_FETCHED
+  ERP_SYNC_REQUESTED
+  ERP_SYNC_SUCCEEDED
+  ERP_SYNC_FAILED
+  ERP_SYNC_RETRY_REQUESTED
+  STUDENT_IMPORT_CREATED
+}
+
+model School {
+  id                   String                 @id
+  code                 String                 @unique
+  name                 String
+  status               SchoolStatus           @default(ACTIVE)
+  embeddingSyncVersion Int                    @default(0)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  devices              Device[]
+  students             Student[]
+  faceEmbeddings       FaceEmbeddingMetadata[]
+  attendanceEvents     AttendanceEvent[]
+  dailySummaries       AttendanceDailySummary[]
+  failedRecognitions   FailedRecognitionLog[]
+  enrollmentRequests   EnrollmentRequest[]
+  importJobs           ImportJob[]
+  importJobItems       ImportJobItem[]
+  embeddingJobs        EmbeddingJob[]
+  attendanceRule       SchoolAttendanceRule?
+  auditLogs            AuditLog[]
+  erpSyncStatuses      ErpSyncStatus[]
+}
+
+model Device {
+  id                   String                 @id
+  schoolId             String
+  gateId               String
+  name                 String
+  status               DeviceStatus           @default(ACTIVE)
+  authTokenHash        String?
+  configVersion        Int                    @default(1)
+  embeddingSyncVersion Int                    @default(0)
+  deviceInfo           Json?
+  appVersion           String?
+  lastHeartbeatAt      DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  school               School                 @relation(fields: [schoolId], references: [id])
+  attendanceEvents     AttendanceEvent[]
+  failedRecognitions   FailedRecognitionLog[]
+  enrollmentRequests   EnrollmentRequest[]
+  auditLogs            AuditLog[]
+
+  @@index([schoolId, gateId])
+  @@index([status])
+}
+
+model Student {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  erpStudentId         String
+  name                 String
+  className            String
+  section              String?
+  rollNumber           String?
+  status               StudentStatus          @default(ACTIVE)
+  updatedAt            DateTime               @updatedAt
+  createdAt            DateTime               @default(now())
+  school               School                 @relation(fields: [schoolId], references: [id])
+  faceEmbeddings       FaceEmbeddingMetadata[]
+  attendanceEvents     AttendanceEvent[]
+  dailySummaries       AttendanceDailySummary[]
+  enrollmentRequests   EnrollmentRequest[]
+
+  @@unique([schoolId, erpStudentId])
+  @@index([schoolId, status])
+}
+
+model FaceEmbeddingMetadata {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  erpStudentId         String
+  modelVersion         String
+  embeddingSyncVersion Int
+  embeddingSize        Int
+  embeddingBase64      String?
+  qualityScore         Float?
+  source               String
+  status               EmbeddingStatus        @default(ACTIVE)
+  checksum             String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  deletedAt            DateTime?
+  school               School                 @relation(fields: [schoolId], references: [id])
+  student              Student?               @relation(fields: [schoolId, erpStudentId], references: [schoolId, erpStudentId])
+
+  @@index([schoolId, modelVersion, status])
+  @@index([schoolId, embeddingSyncVersion])
+}
+
+model AttendanceEvent {
+  id                   String                 @id @default(uuid())
+  eventId              String
+  schoolId             String
+  erpStudentId         String
+  deviceId             String
+  gateId               String
+  eventType            AttendanceEventType
+  attendanceDate       DateTime               @db.Date
+  timestampLocal       DateTime
+  timestampServer      DateTime               @default(now())
+  matchScore           Float
+  livenessScore        Float
+  qualityScore         Float
+  modelVersion         String?
+  syncStatus           SyncStatus             @default(ACCEPTED)
+  rawPayload           Json
+  createdAt            DateTime               @default(now())
+  school               School                 @relation(fields: [schoolId], references: [id])
+  student              Student?               @relation(fields: [schoolId, erpStudentId], references: [schoolId, erpStudentId])
+  device               Device                 @relation(fields: [deviceId], references: [id])
+
+  @@unique([schoolId, eventId])
+  @@index([schoolId, erpStudentId, attendanceDate])
+  @@index([deviceId, timestampServer])
+  @@index([syncStatus])
+}
+
+model AttendanceDailySummary {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  erpStudentId         String
+  attendanceDate       DateTime               @db.Date
+  status               AttendanceEventType
+  firstEventId         String
+  firstSeenAt          DateTime
+  lastSeenAt           DateTime
+  inTime               DateTime?
+  outTime              DateTime?
+  eventCount           Int                    @default(1)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  school               School                 @relation(fields: [schoolId], references: [id])
+  student              Student?               @relation(fields: [schoolId, erpStudentId], references: [schoolId, erpStudentId])
+
+  @@unique([schoolId, erpStudentId, attendanceDate])
+  @@index([schoolId, attendanceDate])
+}
+
+model ErpSyncStatus {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  attendanceDate       DateTime               @db.Date
+  erpStudentId         String
+  status               ErpSyncState           @default(PENDING)
+  retryCount           Int                    @default(0)
+  lastError            String?
+  lastTriedAt          DateTime?
+  syncedAt             DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  school               School                 @relation(fields: [schoolId], references: [id])
+
+  @@unique([schoolId, erpStudentId, attendanceDate])
+  @@index([schoolId, attendanceDate, status])
+  @@index([status, lastTriedAt])
+}
+
+model FailedRecognitionLog {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  deviceId             String
+  gateId               String?
+  reason               String
+  timestamp            DateTime
+  qualityScore         Float?
+  livenessScore        Float?
+  modelVersion         String?
+  syncStatus           SyncStatus             @default(ACCEPTED)
+  rawPayload           Json
+  createdAt            DateTime               @default(now())
+  school               School                 @relation(fields: [schoolId], references: [id])
+  device               Device                 @relation(fields: [deviceId], references: [id])
+
+  @@index([schoolId, timestamp])
+  @@index([deviceId, timestamp])
+}
+
+model EnrollmentRequest {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  erpStudentId         String
+  deviceId             String
+  gateId               String?
+  studentName          String?
+  className            String?
+  section              String?
+  rollNumber           String?
+  modelVersion         String?
+  qualityScore         Float?
+  status               EnrollmentStatus       @default(PENDING)
+  rawPayload           Json
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  school               School                 @relation(fields: [schoolId], references: [id])
+  student              Student?               @relation(fields: [schoolId, erpStudentId], references: [schoolId, erpStudentId])
+  device               Device                 @relation(fields: [deviceId], references: [id])
+
+  @@index([schoolId, erpStudentId, status])
+  @@index([deviceId, createdAt])
+}
+
+model ImportJob {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  status               ImportJobStatus        @default(PENDING)
+  totalRows            Int                    @default(0)
+  validRows            Int                    @default(0)
+  failedRows           Int                    @default(0)
+  studentsCreated      Int                    @default(0)
+  studentsUpdated      Int                    @default(0)
+  embeddingsCreated    Int                    @default(0)
+  failedEmbeddings     Int                    @default(0)
+  sourceFileName       String?
+  zipFileName          String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  completedAt          DateTime?
+  school               School                 @relation(fields: [schoolId], references: [id])
+  items                ImportJobItem[]
+
+  @@index([schoolId, createdAt])
+  @@index([status])
+}
+
+model ImportJobItem {
+  id                   String                 @id @default(uuid())
+  importJobId          String
+  schoolId             String
+  rowNumber            Int
+  erpStudentId         String?
+  name                 String?
+  className            String?
+  section              String?
+  rollNumber           String?
+  photoFileName        String?
+  status               ImportJobItemStatus    @default(PENDING)
+  errorCode            String?
+  errorMessage         String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  importJob            ImportJob              @relation(fields: [importJobId], references: [id], onDelete: Cascade)
+  school               School                 @relation(fields: [schoolId], references: [id])
+  embeddingJob         EmbeddingJob?
+
+  @@index([importJobId, status])
+  @@index([schoolId, erpStudentId])
+}
+
+model EmbeddingJob {
+  id                   String                 @id @default(uuid())
+  schoolId             String
+  erpStudentId         String
+  importJobItemId      String?                @unique
+  status               EmbeddingJobStatus     @default(PENDING)
+  modelVersion         String?
+  embeddingSize        Int?
+  qualityScore         Float?
+  errorCode            String?
+  errorMessage         String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  completedAt          DateTime?
+  school               School                 @relation(fields: [schoolId], references: [id])
+  importJobItem        ImportJobItem?         @relation(fields: [importJobItemId], references: [id], onDelete: SetNull)
+
+  @@index([schoolId, status])
+  @@index([schoolId, erpStudentId])
+}
+
+model SchoolAttendanceRule {
+  id                          String          @id @default(uuid())
+  schoolId                    String          @unique
+  schoolStartTime             String          @default("08:00")
+  lateAfterTime               String          @default("08:15")
+  halfDayAfterTime            String          @default("10:30")
+  duplicateScanCooldownMinutes Int            @default(10)
+  requireOutTime              Boolean         @default(false)
+  recognitionMode             String          @default("Strict")
+  configVersion               Int             @default(1)
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+  school                      School          @relation(fields: [schoolId], references: [id])
+}
+
+model AuditLog {
+  id                   String                 @id @default(uuid())
+  schoolId             String?
+  deviceId             String?
+  actorType            String
+  actorId              String?
+  action               AuditAction
+  entityType           String
+  entityId             String?
+  metadata             Json?
+  createdAt            DateTime               @default(now())
+  school               School?                @relation(fields: [schoolId], references: [id])
+  device               Device?                @relation(fields: [deviceId], references: [id])
+
+  @@index([schoolId, createdAt])
+  @@index([deviceId, createdAt])
+  @@index([action, createdAt])
+}

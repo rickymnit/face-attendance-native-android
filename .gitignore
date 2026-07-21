@@ -1,0 +1,55 @@
+# Android / Gradle
+**/.gradle/
+**/.kotlin/
+**/build/
+**/captures/
+**/*.apk
+**/*.aab
+**/*.ap_
+**/local.properties
+**/app/schemas/
+
+# Node.js / Next.js / NestJS
+**/node_modules/
+**/.next/
+**/dist/
+**/coverage/
+**/.turbo/
+**/.vercel/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# Python
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# Docker / env / logs
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+**/logs/
+**/docker-data/
+**/postgres-data/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated caches
+**/*.tsbuildinfo
+
+# Local backup of nested repositories moved before creating the master repo
+.git-backups/

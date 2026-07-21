@@ -1,0 +1,15 @@
+package com.schoollog.attendance.ml.recognition
+
+enum class EmbeddingFailureReason {
+    MODEL_NOT_FOUND,
+    MODEL_LOAD_FAILED,
+    INPUT_TENSOR_SHAPE_MISMATCH,
+    INPUT_TENSOR_TYPE_MISMATCH,
+    OUTPUT_TENSOR_SHAPE_MISMATCH,
+    OUTPUT_TENSOR_TYPE_MISMATCH,
+    OUTPUT_SIZE_MISMATCH,
+    INVALID_INPUT,
+    INFERENCE_FAILED,
+    INVALID_OUTPUT,
+    SUCCESS,
+}
