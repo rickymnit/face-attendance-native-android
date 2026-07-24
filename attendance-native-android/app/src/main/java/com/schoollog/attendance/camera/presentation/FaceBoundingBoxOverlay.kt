@@ -41,38 +41,69 @@ fun FaceBoundingBoxOverlay(
         }
 
         val result = faceDetectionResult ?: return@Canvas
-        val boxColor = when {
-            result.faceCount > 1 -> MultipleFaceColor
-            result.quality.qualityPassed -> PassedFaceColor
-            else -> FailedFaceColor
+
+        result.faces.filter { it != result.selectedPrimaryFace }.forEach { face ->
+            drawFaceBox(
+                face = face,
+                scale = scale,
+                offsetX = offsetX,
+                offsetY = offsetY,
+                mirrorHorizontally = mirrorHorizontally,
+                canvasWidth = size.width,
+                color = BackgroundFaceColor,
+                strokeWidth = BackgroundFaceBoxStrokeWidth,
+            )
         }
 
-        result.faces.forEach { face ->
-            val mappedLeft = face.boundingBox.left * scale + offsetX
-            val mappedTop = face.boundingBox.top * scale + offsetY
-            val mappedRight = face.boundingBox.right * scale + offsetX
-            val mappedBottom = face.boundingBox.bottom * scale + offsetY
-            val left = if (mirrorHorizontally) size.width - mappedRight else mappedLeft
-            val right = if (mirrorHorizontally) size.width - mappedLeft else mappedRight
-            val top = mappedTop
-            val bottom = mappedBottom
+        val selectedFace = result.selectedPrimaryFace ?: return@Canvas
+        val boxColor = if (result.quality.qualityPassed) PassedFaceColor else FailedFaceColor
+        drawFaceBox(
+            face = selectedFace,
+            scale = scale,
+            offsetX = offsetX,
+            offsetY = offsetY,
+            mirrorHorizontally = mirrorHorizontally,
+            canvasWidth = size.width,
+            color = boxColor,
+            strokeWidth = FaceBoxStrokeWidth,
+        )
+    }
+}
 
-            if (right > left && bottom > top) {
-                drawRect(
-                    color = boxColor,
-                    topLeft = Offset(left, top),
-                    size = Size(right - left, bottom - top),
-                    style = Stroke(width = FaceBoxStrokeWidth),
-                )
-            }
-        }
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFaceBox(
+    face: com.schoollog.attendance.ml.face.DetectedFace,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    mirrorHorizontally: Boolean,
+    canvasWidth: Float,
+    color: Color,
+    strokeWidth: Float,
+) {
+    val mappedLeft = face.boundingBox.left * scale + offsetX
+    val mappedTop = face.boundingBox.top * scale + offsetY
+    val mappedRight = face.boundingBox.right * scale + offsetX
+    val mappedBottom = face.boundingBox.bottom * scale + offsetY
+    val left = if (mirrorHorizontally) canvasWidth - mappedRight else mappedLeft
+    val right = if (mirrorHorizontally) canvasWidth - mappedLeft else mappedRight
+    val top = mappedTop
+    val bottom = mappedBottom
+
+    if (right > left && bottom > top) {
+        drawRect(
+            color = color,
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top),
+            style = Stroke(width = strokeWidth),
+        )
     }
 }
 
 private val PassedFaceColor = Color(0xFF28D17C)
 private val FailedFaceColor = Color(0xFFFFC043)
-private val MultipleFaceColor = Color(0xFFFF4D4D)
+private val BackgroundFaceColor = Color.White.copy(alpha = 0.55f)
 private const val FaceBoxStrokeWidth = 5f
+private const val BackgroundFaceBoxStrokeWidth = 2.5f
 private const val CenterGuideStrokeWidth = 2f
 private const val CenterGuideWidthRatio = 0.52f
 private const val CenterGuideHeightRatio = 0.58f

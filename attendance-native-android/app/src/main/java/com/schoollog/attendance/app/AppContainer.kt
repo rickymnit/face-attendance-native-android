@@ -20,6 +20,7 @@ import com.schoollog.attendance.debugqa.domain.RecognitionCalibrationLogReposito
 import com.schoollog.attendance.debugqa.domain.RecognitionQaRepository
 import com.schoollog.attendance.enrollment.data.RoomEnrollmentRepository
 import com.schoollog.attendance.enrollment.domain.EnrollmentRepository
+import com.schoollog.attendance.sync.data.DeviceHealthReporter
 import com.schoollog.attendance.sync.data.RoomAttendanceSyncRepository
 import com.schoollog.attendance.sync.data.RoomEmbeddingSyncRepository
 import com.schoollog.attendance.sync.data.SyncApi
@@ -33,6 +34,8 @@ class AppContainer(context: Context) {
     val syncApi: SyncApi = SyncApiFactory.create(deviceBindingRepository)
     private val database = AppDatabase.create(context)
     private val attendanceEventDao = database.attendanceEventDao()
+    private val failedRecognitionDao = database.failedRecognitionDao()
+    private val faceEmbeddingDao = database.faceEmbeddingDao()
 
     val attendanceEventRepository: AttendanceEventRepository =
         RoomAttendanceEventRepository(attendanceEventDao)
@@ -41,10 +44,10 @@ class AppContainer(context: Context) {
         RoomStudentRepository(database.studentDao())
 
     val failedRecognitionRepository: FailedRecognitionRepository =
-        RoomFailedRecognitionRepository(database.failedRecognitionDao())
+        RoomFailedRecognitionRepository(failedRecognitionDao)
 
     val faceEmbeddingRepository: FaceEmbeddingRepository =
-        RoomFaceEmbeddingRepository(database.faceEmbeddingDao())
+        RoomFaceEmbeddingRepository(faceEmbeddingDao)
 
     val enrollmentRepository: EnrollmentRepository =
         RoomEnrollmentRepository(
@@ -56,7 +59,7 @@ class AppContainer(context: Context) {
     val attendanceSyncRepository: AttendanceSyncRepository =
         RoomAttendanceSyncRepository(
             attendanceEventDao = attendanceEventDao,
-            failedRecognitionDao = database.failedRecognitionDao(),
+            failedRecognitionDao = failedRecognitionDao,
             settingsRepository = settingsRepository,
             deviceBindingRepository = deviceBindingRepository,
             syncApi = syncApi,
@@ -73,7 +76,17 @@ class AppContainer(context: Context) {
     val recognitionQaRepository: RecognitionQaRepository =
         RoomRecognitionQaRepository(
             attendanceEventDao = attendanceEventDao,
-            faceEmbeddingDao = database.faceEmbeddingDao(),
+            faceEmbeddingDao = faceEmbeddingDao,
+        )
+
+    val deviceHealthReporter: DeviceHealthReporter =
+        DeviceHealthReporter(
+            context = context,
+            attendanceEventDao = attendanceEventDao,
+            failedRecognitionDao = failedRecognitionDao,
+            faceEmbeddingDao = faceEmbeddingDao,
+            deviceBindingRepository = deviceBindingRepository,
+            syncApi = syncApi,
         )
 
     val recognitionCalibrationLogRepository: RecognitionCalibrationLogRepository =

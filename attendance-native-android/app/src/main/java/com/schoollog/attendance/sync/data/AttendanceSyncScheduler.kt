@@ -15,6 +15,7 @@ object AttendanceSyncScheduler {
     private const val ManualWorkName = "attendance-manual-sync"
     private const val PeriodicEmbeddingWorkName = "embedding-periodic-sync"
     private const val ManualEmbeddingWorkName = "embedding-manual-sync"
+    private const val PeriodicHealthWorkName = "device-health-periodic-heartbeat"
 
     fun schedulePeriodicSync(context: Context) {
         val request = PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
@@ -23,6 +24,18 @@ object AttendanceSyncScheduler {
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             PeriodicWorkName,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            request,
+        )
+    }
+
+    fun schedulePeriodicHealthHeartbeat(context: Context) {
+        val request = PeriodicWorkRequestBuilder<HealthHeartbeatWorker>(15, TimeUnit.MINUTES)
+            .setConstraints(syncConstraints())
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            PeriodicHealthWorkName,
             ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )

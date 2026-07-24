@@ -126,6 +126,7 @@ class RoomEmbeddingSyncRepository(
 
         return if (errors.isEmpty()) {
             deviceBindingRepository.updateEmbeddingSyncVersion(delta.toVersion)
+            deviceBindingRepository.updateLastEmbeddingSync(System.currentTimeMillis())
             publishSuccess(appliedCount)
         } else {
             logger(errors.joinToString(separator = "; "))

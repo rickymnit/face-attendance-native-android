@@ -1,32 +1,39 @@
 package com.schoollog.attendance.ml.face
 
-import android.os.SystemClock
 import com.schoollog.attendance.camera.domain.CameraFrameInfo
 import com.schoollog.attendance.camera.domain.PerformanceMonitor
 import kotlin.math.abs
 import kotlin.math.hypot
 
-class FaceQualityEvaluator {
+class FaceQualityEvaluator(
+    private val nanoTime: () -> Long = System::nanoTime,
+    private val recordMetrics: Boolean = true,
+) {
     fun evaluate(
-        faces: List<DetectedFace>,
+        selectedFace: DetectedFace?,
         frameInfo: CameraFrameInfo,
     ): FaceQualityResult {
-        val startedAtNanos = SystemClock.elapsedRealtimeNanos()
+        val startedAtNanos = nanoTime()
         return try {
-            evaluateInternal(faces, frameInfo)
+            evaluateInternal(selectedFace, frameInfo)
         } finally {
-            PerformanceMonitor.recordQualityEvaluation(startedAtNanos)
+            if (recordMetrics) PerformanceMonitor.recordQualityEvaluation(startedAtNanos)
         }
     }
 
-    private fun evaluateInternal(
+    fun evaluate(
         faces: List<DetectedFace>,
         frameInfo: CameraFrameInfo,
-    ): FaceQualityResult {
-        if (faces.isEmpty()) return failed(FaceQualityFailureReason.NO_FACE, 0f)
-        if (faces.size > 1) return failed(FaceQualityFailureReason.MULTIPLE_FACES, 0f)
+    ): FaceQualityResult = evaluate(
+        selectedFace = faces.maxByOrNull { it.boundingBox.area },
+        frameInfo = frameInfo,
+    )
 
-        val face = faces.single()
+    private fun evaluateInternal(
+        selectedFace: DetectedFace?,
+        frameInfo: CameraFrameInfo,
+    ): FaceQualityResult {
+        val face = selectedFace ?: return failed(FaceQualityFailureReason.NO_FACE, 0f)
         val frameWidth = frameInfo.analysisWidth.coerceAtLeast(1).toFloat()
         val frameHeight = frameInfo.analysisHeight.coerceAtLeast(1).toFloat()
         val box = face.boundingBox

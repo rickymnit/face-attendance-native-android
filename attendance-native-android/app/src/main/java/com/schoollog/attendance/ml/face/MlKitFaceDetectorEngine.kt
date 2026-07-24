@@ -1,6 +1,5 @@
 package com.schoollog.attendance.ml.face
 
-import android.os.SystemClock
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageProxy
 import com.google.android.gms.tasks.Task
@@ -30,9 +29,9 @@ class MlKitFaceDetectorEngine(
         imageProxy: ImageProxy,
         frameInfo: CameraFrameInfo,
     ): Task<FaceDetectionResult> {
-        val faceDetectionStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+        val faceDetectionStartedAtNanos = System.nanoTime()
         val mediaImage = imageProxy.image
-            ?: return Tasks.forResult(noFaceResult()).also {
+            ?: return Tasks.forResult(FaceDetectionResult.noFace()).also {
                 PerformanceMonitor.recordFaceDetection(faceDetectionStartedAtNanos)
             }
         val inputImage = InputImage.fromMediaImage(
@@ -54,13 +53,12 @@ class MlKitFaceDetectorEngine(
         detector.close()
     }
 
-    private fun List<Face>.toFaceDetectionResult(frameInfo: CameraFrameInfo): FaceDetectionResult {
-        val detectedFaces = map { it.toDetectedFace() }
-        return FaceDetectionResult(
-            faces = detectedFaces,
-            quality = qualityEvaluator.evaluate(detectedFaces, frameInfo),
+    private fun List<Face>.toFaceDetectionResult(frameInfo: CameraFrameInfo): FaceDetectionResult =
+        FaceDetectionResult.fromFaces(
+            faces = map { it.toDetectedFace() },
+            frameInfo = frameInfo,
+            qualityEvaluator = qualityEvaluator,
         )
-    }
 
     private fun Face.toDetectedFace(): DetectedFace {
         val box = boundingBox
@@ -81,16 +79,6 @@ class MlKitFaceDetectorEngine(
             smilingProbability = smilingProbability?.takeIf { it >= 0f },
         )
     }
-
-    private fun noFaceResult(reason: FaceQualityFailureReason = FaceQualityFailureReason.NO_FACE): FaceDetectionResult =
-        FaceDetectionResult(
-            faces = emptyList(),
-            quality = FaceQualityResult(
-                qualityPassed = false,
-                qualityScore = 0f,
-                failureReason = reason,
-            ),
-        )
 
     private object DirectExecutor : Executor {
         override fun execute(command: Runnable) {

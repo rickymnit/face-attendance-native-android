@@ -87,6 +87,8 @@ class DeviceSetupViewModel(
                 embeddingSyncVersion = response.embeddingSyncVersion,
                 registeredAtMillis = now,
                 lastHeartbeatAtMillis = null,
+                lastAttendanceSyncAtMillis = null,
+                lastEmbeddingSyncAtMillis = null,
             ),
         )
         settingsRepository.saveAttendanceRules(response.toAttendanceRules(request))

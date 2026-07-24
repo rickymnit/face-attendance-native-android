@@ -18,6 +18,9 @@ interface AttendanceEventDao {
     @Query("SELECT * FROM attendance_events WHERE syncStatus = 'PENDING' ORDER BY createdAt ASC LIMIT :limit")
     suspend fun pendingEvents(limit: Int = 100): List<AttendanceEventEntity>
 
+    @Query("SELECT COUNT(*) FROM attendance_events WHERE syncStatus = 'PENDING'")
+    suspend fun pendingSyncCount(): Int
+
     @Query("UPDATE attendance_events SET syncStatus = :syncStatus WHERE eventId IN (:eventIds)")
     suspend fun updateSyncStatus(eventIds: List<String>, syncStatus: String)
 

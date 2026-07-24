@@ -23,6 +23,17 @@ interface FaceEmbeddingDao {
         status: String = FaceEmbeddingStatusValues.Active,
     ): List<FaceEmbeddingEntity>
 
+
+    @Query(
+        "SELECT COUNT(*) FROM face_embeddings " +
+            "WHERE schoolId = :schoolId AND modelVersion = :modelVersion AND status = :status",
+    )
+    suspend fun activeCountForSchoolModel(
+        schoolId: String,
+        modelVersion: String,
+        status: String = FaceEmbeddingStatusValues.Active,
+    ): Int
+
     @Query(
         "SELECT * FROM face_embeddings " +
             "WHERE schoolId = :schoolId AND erpStudentId = :erpStudentId " +

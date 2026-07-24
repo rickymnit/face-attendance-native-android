@@ -17,6 +17,9 @@ interface FailedRecognitionDao {
     @Query("SELECT * FROM failed_recognitions WHERE syncStatus = 'PENDING' ORDER BY timestamp ASC LIMIT :limit")
     suspend fun pendingFailures(limit: Int = 100): List<FailedRecognitionEntity>
 
+    @Query("SELECT COUNT(*) FROM failed_recognitions WHERE syncStatus = 'PENDING'")
+    suspend fun pendingSyncCount(): Int
+
     @Query("UPDATE failed_recognitions SET syncStatus = :syncStatus WHERE id IN (:ids)")
     suspend fun updateSyncStatus(ids: List<String>, syncStatus: String)
 }

@@ -5,6 +5,8 @@ export interface DashboardSession {
   role: SupportRole;
 }
 
+export type DeviceHealthStatus = 'HEALTHY' | 'WARNING' | 'CRITICAL';
+
 export interface SchoolHealth {
   schoolId: string;
   schoolName: string;
@@ -14,6 +16,9 @@ export interface SchoolHealth {
   pendingErpSync: number;
   failedRecognitionCount: number;
   embeddingSyncVersion: number;
+  healthyDevices: number;
+  warningDevices: number;
+  criticalDevices: number;
 }
 
 export interface DeviceInfo {
@@ -22,11 +27,22 @@ export interface DeviceInfo {
   name: string;
   status: string;
   online: boolean;
+  healthStatus: DeviceHealthStatus;
+  healthReason: string;
   lastHeartbeat: string | null;
   appVersion: string | null;
   modelVersion: string | null;
+  embeddingCount: number | null;
   pendingAttendanceSync: number | null;
   pendingFailedRecognitionSync: number | null;
+  lastAttendanceSyncAt: string | null;
+  lastEmbeddingSyncAt: string | null;
+  batteryPercent: number | null;
+  isCharging: boolean | null;
+  networkStatus: string | null;
+  cameraStatus: string | null;
+  averageDecisionTime: number | null;
+  lastError: string | null;
   embeddingSyncVersion: number;
 }
 
@@ -81,6 +97,8 @@ export interface OfflineDevice {
   name: string;
   lastHeartbeat: string | null;
   appVersion: string | null;
+  healthStatus: DeviceHealthStatus;
+  healthReason: string;
 }
 
 export interface DeviceLogsSummary {

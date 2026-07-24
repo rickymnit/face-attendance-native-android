@@ -15,18 +15,18 @@ class StableFaceTracker(
         frameInfo: CameraFrameInfo,
         faceDetectionResult: FaceDetectionResult,
     ): StableFaceTrackingResult {
-        if (!faceDetectionResult.hasExactlyOneFace || !faceDetectionResult.quality.passes) {
+        if (!faceDetectionResult.hasSelectedPrimaryFace || !faceDetectionResult.quality.passes) {
             reset()
             return StableFaceTrackingResult(
                 state = when {
-                    faceDetectionResult.faceCount == 1 -> StableFaceTrackerState.FACE_DETECTED
+                    faceDetectionResult.hasSelectedPrimaryFace -> StableFaceTrackerState.FACE_DETECTED
                     else -> StableFaceTrackerState.WAITING_FOR_FACE
                 },
                 stableDurationMillis = 0L,
             )
         }
 
-        val face = faceDetectionResult.primaryFace ?: run {
+        val face = faceDetectionResult.selectedPrimaryFace ?: run {
             reset()
             return StableFaceTrackingResult(StableFaceTrackerState.WAITING_FOR_FACE, 0L)
         }

@@ -75,11 +75,56 @@ export class DevicesService {
   async heartbeat(dto: DeviceHeartbeatDto, auth: DeviceAuthContext) {
     this.assertAuthMatches(dto.deviceId, dto.schoolId, auth);
     const timestamp = parseIsoDateTime(dto.timestamp, 'timestamp');
+    const lastAttendanceSyncAt = dto.lastAttendanceSyncAt
+      ? parseIsoDateTime(dto.lastAttendanceSyncAt, 'lastAttendanceSyncAt')
+      : null;
+    const lastEmbeddingSyncAt = dto.lastEmbeddingSyncAt
+      ? parseIsoDateTime(dto.lastEmbeddingSyncAt, 'lastEmbeddingSyncAt')
+      : null;
+    const networkStatus = dto.networkStatus ?? dto.networkType ?? null;
     const device = await this.prisma.device.update({
       where: { id: dto.deviceId },
       data: {
         lastHeartbeatAt: timestamp,
         appVersion: dto.appVersion,
+      },
+    });
+    await this.prisma.deviceHealth.upsert({
+      where: { deviceId: dto.deviceId },
+      create: {
+        deviceId: dto.deviceId,
+        schoolId: dto.schoolId,
+        gateId: dto.gateId,
+        appVersion: dto.appVersion,
+        modelVersion: dto.modelVersion,
+        embeddingCount: dto.embeddingCount ?? 0,
+        pendingAttendanceCount: dto.pendingAttendanceCount,
+        pendingFailedRecognitionCount: dto.pendingFailedRecognitionCount,
+        lastAttendanceSyncAt,
+        lastEmbeddingSyncAt,
+        batteryPercent: dto.batteryPercent,
+        isCharging: dto.isCharging,
+        networkStatus,
+        cameraStatus: dto.cameraStatus,
+        averageDecisionTime: dto.averageDecisionTime,
+        lastError: dto.lastError,
+      },
+      update: {
+        schoolId: dto.schoolId,
+        gateId: dto.gateId,
+        appVersion: dto.appVersion,
+        modelVersion: dto.modelVersion,
+        embeddingCount: dto.embeddingCount ?? 0,
+        pendingAttendanceCount: dto.pendingAttendanceCount,
+        pendingFailedRecognitionCount: dto.pendingFailedRecognitionCount,
+        lastAttendanceSyncAt,
+        lastEmbeddingSyncAt,
+        batteryPercent: dto.batteryPercent,
+        isCharging: dto.isCharging,
+        networkStatus,
+        cameraStatus: dto.cameraStatus,
+        averageDecisionTime: dto.averageDecisionTime,
+        lastError: dto.lastError,
       },
     });
     await this.auditService.log({
@@ -93,7 +138,15 @@ export class DevicesService {
         pendingFailedRecognitionCount: dto.pendingFailedRecognitionCount,
         batteryPercent: dto.batteryPercent,
         isCharging: dto.isCharging,
+        networkStatus,
         networkType: dto.networkType,
+        modelVersion: dto.modelVersion,
+        embeddingCount: dto.embeddingCount ?? 0,
+        lastAttendanceSyncAt: lastAttendanceSyncAt?.toISOString() ?? null,
+        lastEmbeddingSyncAt: lastEmbeddingSyncAt?.toISOString() ?? null,
+        cameraStatus: dto.cameraStatus,
+        averageDecisionTime: dto.averageDecisionTime,
+        lastError: dto.lastError,
       },
     });
 

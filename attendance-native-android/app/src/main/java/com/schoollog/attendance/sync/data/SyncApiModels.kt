@@ -36,11 +36,18 @@ data class DeviceHeartbeatRequest(
     val timestamp: String,
     val appVersion: String,
     val modelVersion: String,
+    val embeddingCount: Int = 0,
     val pendingAttendanceCount: Int,
     val pendingFailedRecognitionCount: Int,
+    val lastAttendanceSyncAt: String? = null,
+    val lastEmbeddingSyncAt: String? = null,
     val batteryPercent: Int? = null,
     val isCharging: Boolean? = null,
+    val networkStatus: String? = null,
     val networkType: String? = null,
+    val cameraStatus: String? = null,
+    val averageDecisionTime: Double? = null,
+    val lastError: String? = null,
 )
 
 data class DeviceHeartbeatResponse(

@@ -8,6 +8,8 @@ interface DeviceBindingRepository : SyncAuthProvider {
     fun currentBinding(): DeviceBinding?
     suspend fun saveBinding(binding: DeviceBinding)
     suspend fun updateLastHeartbeat(timestampMillis: Long)
+    suspend fun updateLastAttendanceSync(timestampMillis: Long)
+    suspend fun updateLastEmbeddingSync(timestampMillis: Long)
     suspend fun updateEmbeddingSyncVersion(version: Long)
     suspend fun clearBinding()
 }

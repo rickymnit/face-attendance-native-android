@@ -74,6 +74,7 @@ import com.schoollog.attendance.ml.face.FaceCropResult
 import com.schoollog.attendance.ml.face.FaceDetectionResult
 import com.schoollog.attendance.ml.liveness.LivenessDecision
 import com.schoollog.attendance.ml.liveness.LivenessResult
+import com.schoollog.attendance.sync.data.DeviceHealthMonitor
 import com.schoollog.attendance.sync.domain.SyncRunStatus
 import java.text.DateFormat
 import java.util.Date
@@ -138,7 +139,10 @@ fun GateCameraScreen(onBack: () -> Unit) {
                         analyzerFps = fps
                         gateAttendanceViewModel.onPipelineOutput(output)
                     },
-                    onCameraStatusChanged = { status -> cameraStatus = status },
+                    onCameraStatusChanged = { status ->
+                        cameraStatus = status
+                        DeviceHealthMonitor.updateCameraStatus(status)
+                    },
                     allowDebugMockRecognition = BuildConfig.DEBUG && attendanceRules.allowDebugMockRecognition,
                     schoolId = attendanceRules.schoolId,
                     recognitionMode = attendanceRules.recognitionMode,
@@ -517,6 +521,7 @@ private fun DebugPanel(
         Text(text = "Debug", color = Color.White, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         Text(text = "Camera: $cameraStatus", color = Color.White, style = MaterialTheme.typography.bodySmall)
         Text(text = "Face: ${faceDetectionResult.faceStatusText()}", color = Color.White, style = MaterialTheme.typography.bodySmall)
+        Text(text = "Selection: ${faceDetectionResult.selectionStatusText()}", color = Color.White, style = MaterialTheme.typography.bodySmall)
         Text(text = "Angles: ${faceDetectionResult.faceAngleText()}", color = Color.White, style = MaterialTheme.typography.bodySmall)
         Text(text = "Box: ${faceDetectionResult.boundingBoxStatusText()}", color = Color.White, style = MaterialTheme.typography.bodySmall)
         Text(text = "Stability: ${stableFaceTrackingResult.stabilityStatusText()}", color = Color.White, style = MaterialTheme.typography.bodySmall)
@@ -772,11 +777,18 @@ private fun SyncRunStatus.shortText(): String =
 
 private fun FaceDetectionResult?.faceStatusText(): String {
     val result = this ?: return "No face detected"
-    return when (result.faceCount) {
-        0 -> "No face detected"
-        1 -> if (result.quality.qualityPassed) "One face detected" else result.quality.reason
-        else -> "Multiple faces detected"
+    return when {
+        result.faceCount == 0 -> "No face detected"
+        result.faceCount > 1 && result.quality.qualityPassed -> "Multiple faces detected, using closest face"
+        result.faceCount > 1 -> "Multiple faces detected, selected face needs adjustment"
+        result.quality.qualityPassed -> "One face detected"
+        else -> result.quality.reason
     }
+}
+
+private fun FaceDetectionResult?.selectionStatusText(): String {
+    val result = this ?: return "--"
+    return "${result.faceCount} face(s), ${result.selectionReason.name}"
 }
 
 private fun FaceDetectionResult?.faceAngleText(): String {

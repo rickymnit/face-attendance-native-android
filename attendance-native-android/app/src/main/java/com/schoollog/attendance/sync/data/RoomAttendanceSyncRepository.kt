@@ -207,10 +207,12 @@ class RoomAttendanceSyncRepository(
             type == SyncApiErrorType.Conflict ||
             type == SyncApiErrorType.DuplicateEvent
 
-    private fun publishSuccess(syncedCount: Int, duplicateCount: Int = 0): SyncRunStatus.Success {
+    private suspend fun publishSuccess(syncedCount: Int, duplicateCount: Int = 0): SyncRunStatus.Success {
+        val completedAtMillis = System.currentTimeMillis()
+        deviceBindingRepository.updateLastAttendanceSync(completedAtMillis)
         val status = SyncRunStatus.Success(
             syncedCount = syncedCount,
-            completedAtMillis = System.currentTimeMillis(),
+            completedAtMillis = completedAtMillis,
             duplicateCount = duplicateCount,
         )
         _lastSyncStatus.value = status

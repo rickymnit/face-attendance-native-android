@@ -101,11 +101,11 @@ class CameraFrameAnalyzer(
         frameInfo: CameraFrameInfo,
     ): LiveFramePipelineOutput {
         val detection = faceDetectionResult ?: return this
-        val face = detection.primaryFace ?: return this
+        val face = detection.selectedPrimaryFace ?: return this
         val isReadyForCrop = detection.quality.passes && stableFaceTrackingResult?.isReadyForLiveness == true
         if (!isReadyForCrop) return this
 
-        val cropStartedAtNanos = SystemClock.elapsedRealtimeNanos()
+        val cropStartedAtNanos = System.nanoTime()
         val cropResult = try {
             faceCropper.cropFace(
                 FaceCropRequest(

@@ -2,7 +2,7 @@
 
 ## Goal
 
-The ML pipeline recognizes gate candidates using only live camera frames. The current implementation uses ML Kit for face detection, liveness v0 over live frame sequences, TensorFlow Lite embedding generation, and local cosine matching against active Room embeddings.
+The ML pipeline recognizes gate candidates using only live camera frames. The current implementation uses ML Kit for face detection, liveness v0 over live frame sequences, TensorFlow Lite embedding generation, and local cosine matching against active Room embeddings. It does not use `ImageCapture`, does not call `takePicture()`, and does not save face photos during attendance or enrollment.
 
 ## Face Detection
 
@@ -11,16 +11,18 @@ Interface: `FaceDetectorEngine`
 Responsibilities:
 
 - Detect face bounding boxes from live frame input.
-- Determine whether exactly one face is present.
-- Return face quality metadata.
+- Return all detected faces and select the primary candidate for the current flow.
+- Return face quality metadata for the selected primary face.
 
 Current implementation:
 
 - Uses ML Kit Face Detection on the live `ImageProxy` from CameraX `ImageAnalysis`.
 - Converts `media.Image` to `InputImage` with the frame rotation degrees.
-- Returns face count, bounding box, head Euler angles, eye-open probabilities, smiling probability, and tracking ID when available.
-- Rejects frames with zero faces, multiple faces, too-small faces, off-center faces, excessive head tilt, heavy side-facing pose, and partially out-of-frame faces.
-- Uses `FaceQualityEvaluator` to return `qualityPassed`, `qualityScore`, and a `FaceQualityFailureReason`.
+- Returns all detected face bounding boxes, head Euler angles, eye-open probabilities, smiling probability, and tracking ID when available.
+- In Gate Mode, sorts faces by bounding-box area and selects the largest/closest face as `selectedPrimaryFace`; smaller background faces are retained for debug display but do not block attendance by themselves.
+- In Enrollment, also sorts detected faces by bounding-box area and uses the largest/closest face as `selectedPrimaryFace`; smaller background faces are retained for debug display and do not block enrollment by themselves.
+- Rejects the selected face when there are zero usable faces, the selected face is too small, off-center, excessively tilted, heavy side-facing, or partially out of frame.
+- Uses `FaceQualityEvaluator` to return `qualityPassed`, `qualityScore`, and a `FaceQualityFailureReason` for the selected primary face.
 - Keeps lighting and blur as placeholder scores until real frame-quality models are added.
 
 Future improvements:
@@ -30,7 +32,7 @@ Future improvements:
 
 ## Stable Face Tracking
 
-Before liveness or recognition starts, `StableFaceTracker` requires the same quality-passed face to remain steady for roughly 700 ms. It resets when the face disappears, multiple faces appear, the face moves too much, or head angles change too much.
+Before liveness or recognition starts, `StableFaceTracker` requires the same selected, quality-passed face to remain steady for roughly 700 ms. Gate Mode and Enrollment both track the selected largest face and reset when that primary face disappears, changes suddenly, moves too much, or head angles change too much. Smaller background faces are ignored unless one becomes the new largest face, in which case stability restarts.
 
 Tracker states:
 
@@ -55,10 +57,10 @@ Responsibilities:
 Current v0 implementation:
 
 - `LivenessEngineV0` evaluates a short sequence of live `ImageAnalysis` frame samples after stable-face tracking is ready.
-- Requires the face to remain continuously present as exactly one quality-passed face.
+- Gate Mode requires the selected primary face to remain continuously present as a quality-passed face.
 - Looks for small natural variation in face center, head angle, bounding box size, and eye openness when available.
 - Returns `UNCERTAIN` while collecting the 1-2 second sequence.
-- Returns `FAIL` for missing/multiple faces, face quality failure, or a sequence that is too static.
+- Returns `FAIL` when the selected face disappears, selected-face quality fails, or the selected-face sequence is too static. Multiple background faces do not fail liveness by themselves because liveness evaluates the selected primary face sequence.
 
 Important limitation:
 
@@ -72,7 +74,7 @@ Future implementation:
 
 ## Face Crop And Alignment
 
-`FaceCropper` prepares a normalized in-memory face crop from the live CameraX `ImageAnalysis` frame after face quality and stable tracking pass.
+`FaceCropper` prepares a normalized in-memory face crop from the live CameraX `ImageAnalysis` frame after face quality and stable tracking pass. Gate Mode and Enrollment both crop only `selectedPrimaryFace`, which is the largest detected face for that frame.
 
 Current implementation:
 
@@ -209,7 +211,7 @@ The ambiguity rule remains mandatory: if top 1 and top 2 are too close for the s
 
 Attendance must not be marked unless all gates pass:
 
-1. Exactly one face is detected.
+1. A selected primary face is available from the live frame. When multiple faces are present, the largest/closest face is selected.
 2. Face quality passes.
 3. The same face remains stable for the required hold-still duration.
 4. Liveness passes.

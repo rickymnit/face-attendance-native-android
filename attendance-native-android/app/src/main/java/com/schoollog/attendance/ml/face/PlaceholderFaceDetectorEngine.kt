@@ -14,16 +14,7 @@ class PlaceholderFaceDetectorEngine(
     ): Task<FaceDetectionResult> {
         val simulatedFrameBucket = (frameInfo.timestampNanos / BucketSizeNanos) % SimulationCycleBuckets
         if (simulatedFrameBucket < NoFaceBuckets) {
-            return Tasks.forResult(
-                FaceDetectionResult(
-                    faces = emptyList(),
-                    quality = FaceQualityResult(
-                        qualityPassed = false,
-                        qualityScore = 0f,
-                        failureReason = FaceQualityFailureReason.NO_FACE,
-                    ),
-                ),
-            )
+            return Tasks.forResult(FaceDetectionResult.noFace())
         }
 
         val face = DetectedFace(
@@ -42,20 +33,23 @@ class PlaceholderFaceDetectorEngine(
             rightEyeOpenProbability = 0.82f,
             smilingProbability = 0.1f,
         )
-        val quality = if (simulatedFrameBucket >= StableFaceBucket) {
-            qualityEvaluator.evaluate(listOf(face), frameInfo)
-        } else {
-            FaceQualityResult(
-                qualityPassed = false,
-                qualityScore = 0.54f,
-                failureReason = FaceQualityFailureReason.FACE_NOT_CENTERED,
-            )
-        }
+        val result = FaceDetectionResult.fromFaces(
+            faces = listOf(face),
+            frameInfo = frameInfo,
+            qualityEvaluator = qualityEvaluator,
+        )
         return Tasks.forResult(
-            FaceDetectionResult(
-                faces = listOf(face),
-                quality = quality,
-            ),
+            if (simulatedFrameBucket >= StableFaceBucket) {
+                result
+            } else {
+                result.copy(
+                    quality = FaceQualityResult(
+                        qualityPassed = false,
+                        qualityScore = 0.54f,
+                        failureReason = FaceQualityFailureReason.FACE_NOT_CENTERED,
+                    ),
+                )
+            },
         )
     }
 

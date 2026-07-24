@@ -44,6 +44,8 @@ class SecureDeviceBindingRepository(
             .putLong(EmbeddingSyncVersionKey, binding.embeddingSyncVersion)
             .putLong(RegisteredAtKey, binding.registeredAtMillis)
             .putLong(LastHeartbeatAtKey, binding.lastHeartbeatAtMillis ?: MissingTimestamp)
+            .putLong(LastAttendanceSyncAtKey, binding.lastAttendanceSyncAtMillis ?: MissingTimestamp)
+            .putLong(LastEmbeddingSyncAtKey, binding.lastEmbeddingSyncAtMillis ?: MissingTimestamp)
             .apply()
         _deviceBinding.value = binding
     }
@@ -52,6 +54,20 @@ class SecureDeviceBindingRepository(
         val current = currentBinding() ?: return
         val updated = current.copy(lastHeartbeatAtMillis = timestampMillis)
         preferences.edit().putLong(LastHeartbeatAtKey, timestampMillis).apply()
+        _deviceBinding.value = updated
+    }
+
+    override suspend fun updateLastAttendanceSync(timestampMillis: Long) {
+        val current = currentBinding() ?: return
+        val updated = current.copy(lastAttendanceSyncAtMillis = timestampMillis)
+        preferences.edit().putLong(LastAttendanceSyncAtKey, timestampMillis).apply()
+        _deviceBinding.value = updated
+    }
+
+    override suspend fun updateLastEmbeddingSync(timestampMillis: Long) {
+        val current = currentBinding() ?: return
+        val updated = current.copy(lastEmbeddingSyncAtMillis = timestampMillis)
+        preferences.edit().putLong(LastEmbeddingSyncAtKey, timestampMillis).apply()
         _deviceBinding.value = updated
     }
 
@@ -74,6 +90,8 @@ class SecureDeviceBindingRepository(
         val encryptedToken = preferences.getString(AuthTokenKey, null) ?: return null
         val token = decrypt(encryptedToken).getOrNull() ?: return null
         val lastHeartbeat = preferences.getLong(LastHeartbeatAtKey, MissingTimestamp)
+        val lastAttendanceSync = preferences.getLong(LastAttendanceSyncAtKey, MissingTimestamp)
+        val lastEmbeddingSync = preferences.getLong(LastEmbeddingSyncAtKey, MissingTimestamp)
         return DeviceBinding(
             schoolId = schoolId,
             schoolCode = preferences.getString(SchoolCodeKey, "").orEmpty(),
@@ -86,6 +104,8 @@ class SecureDeviceBindingRepository(
             embeddingSyncVersion = preferences.getLong(EmbeddingSyncVersionKey, 0L),
             registeredAtMillis = preferences.getLong(RegisteredAtKey, 0L),
             lastHeartbeatAtMillis = lastHeartbeat.takeUnless { it == MissingTimestamp },
+            lastAttendanceSyncAtMillis = lastAttendanceSync.takeUnless { it == MissingTimestamp },
+            lastEmbeddingSyncAtMillis = lastEmbeddingSync.takeUnless { it == MissingTimestamp },
         )
     }
 
@@ -143,5 +163,7 @@ class SecureDeviceBindingRepository(
         const val EmbeddingSyncVersionKey = "embedding_sync_version"
         const val RegisteredAtKey = "registered_at"
         const val LastHeartbeatAtKey = "last_heartbeat_at"
+        const val LastAttendanceSyncAtKey = "last_attendance_sync_at"
+        const val LastEmbeddingSyncAtKey = "last_embedding_sync_at"
     }
 }

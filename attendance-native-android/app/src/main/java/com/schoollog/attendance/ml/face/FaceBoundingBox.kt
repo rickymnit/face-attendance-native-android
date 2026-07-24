@@ -8,4 +8,5 @@ data class FaceBoundingBox(
 ) {
     val width: Float = right - left
     val height: Float = bottom - top
+    val area: Float = width.coerceAtLeast(0f) * height.coerceAtLeast(0f)
 }

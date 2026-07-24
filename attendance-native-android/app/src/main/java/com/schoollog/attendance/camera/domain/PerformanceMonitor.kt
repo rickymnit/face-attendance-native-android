@@ -15,9 +15,9 @@ object PerformanceMonitor {
     private val _benchmarkState = MutableStateFlow(PipelineBenchmarkState())
     val benchmarkState: StateFlow<PipelineBenchmarkState> = _benchmarkState.asStateFlow()
 
-    private var inputWindowStartedAtMillis = SystemClock.elapsedRealtime()
+    private var inputWindowStartedAtMillis = elapsedRealtimeMillis()
     private var inputFrameCount = 0
-    private var processedWindowStartedAtMillis = SystemClock.elapsedRealtime()
+    private var processedWindowStartedAtMillis = elapsedRealtimeMillis()
     private var processedFrameCount = 0
     private var faceDetectionSamples = 0L
     private var qualitySamples = 0L
@@ -32,7 +32,7 @@ object PerformanceMonitor {
     private var droppedFrameTotal = 0L
     private var activeBenchmark: MutableBenchmark? = null
 
-    fun markInputFrame(nowMillis: Long = SystemClock.elapsedRealtime()) {
+    fun markInputFrame(nowMillis: Long = elapsedRealtimeMillis()) {
         synchronized(lock) {
             inputFrameCount += 1
             val elapsed = nowMillis - inputWindowStartedAtMillis
@@ -54,7 +54,7 @@ object PerformanceMonitor {
         }
     }
 
-    fun markProcessedFrame(nowMillis: Long = SystemClock.elapsedRealtime()) {
+    fun markProcessedFrame(nowMillis: Long = elapsedRealtimeMillis()) {
         synchronized(lock) {
             processedFrameCount += 1
             activeBenchmark?.memoryUsedMb?.add(usedMemoryMb())
@@ -145,15 +145,15 @@ object PerformanceMonitor {
 
     fun recordPipelineOutput(output: LiveFramePipelineOutput) {
         synchronized(lock) {
-            val hasOneFace = output.faceDetectionResult?.hasExactlyOneFace == true
+            val hasSelectedFace = output.faceDetectionResult?.hasSelectedPrimaryFace == true
             val stableReady = output.stableFaceTrackingResult?.isReadyForLiveness == true
-            if (hasOneFace && pipelineStartedAtMillis == null) {
-                pipelineStartedAtMillis = SystemClock.elapsedRealtime()
+            if (hasSelectedFace && pipelineStartedAtMillis == null) {
+                pipelineStartedAtMillis = elapsedRealtimeMillis()
             }
             if (stableReady && stableDecisionStartedAtMillis == null) {
-                stableDecisionStartedAtMillis = SystemClock.elapsedRealtime()
+                stableDecisionStartedAtMillis = elapsedRealtimeMillis()
             }
-            if (!hasOneFace) {
+            if (!hasSelectedFace) {
                 pipelineStartedAtMillis = null
                 stableDecisionStartedAtMillis = null
             }
@@ -163,7 +163,7 @@ object PerformanceMonitor {
             }
 
             if (output.isDecision()) {
-                val now = SystemClock.elapsedRealtime()
+                val now = elapsedRealtimeMillis()
                 val stableElapsed = stableDecisionStartedAtMillis?.let { (now - it).coerceAtLeast(0L).toDouble() }
                 val faceElapsed = pipelineStartedAtMillis?.let { (now - it).coerceAtLeast(0L).toDouble() }
                 val decisionElapsed = stableElapsed ?: faceElapsed
@@ -288,6 +288,12 @@ object PerformanceMonitor {
             else -> null
         }
 
+    private fun elapsedRealtimeMillis(): Long = runCatching {
+        SystemClock.elapsedRealtime()
+    }.getOrElse {
+        System.currentTimeMillis()
+    }
+
     private fun updateMetrics(block: PerformanceMetrics.() -> PerformanceMetrics) {
         _metrics.value = _metrics.value.block()
     }
@@ -299,7 +305,7 @@ object PerformanceMonitor {
     ): Double = currentAverage + (newValue - currentAverage) / sampleCount
 
     private fun elapsedMillis(startedAtNanos: Long): Double =
-        (SystemClock.elapsedRealtimeNanos() - startedAtNanos).coerceAtLeast(0L) / NanosPerMillis.toDouble()
+        (System.nanoTime() - startedAtNanos).coerceAtLeast(0L) / NanosPerMillis.toDouble()
 
     private fun usedMemoryMb(): Double {
         val runtime = Runtime.getRuntime()

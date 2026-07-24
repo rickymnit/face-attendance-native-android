@@ -12,5 +12,6 @@ class SchoollogAttendanceApp : Application() {
         appContainer = AppContainer(this)
         AttendanceSyncScheduler.schedulePeriodicSync(this)
         AttendanceSyncScheduler.schedulePeriodicEmbeddingSync(this)
+        AttendanceSyncScheduler.schedulePeriodicHealthHeartbeat(this)
     }
 }

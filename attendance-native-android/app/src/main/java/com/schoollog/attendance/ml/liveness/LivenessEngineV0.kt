@@ -1,13 +1,12 @@
 package com.schoollog.attendance.ml.liveness
 
-import android.os.SystemClock
 import com.schoollog.attendance.camera.domain.PerformanceMonitor
 import kotlin.math.abs
 import kotlin.math.hypot
 
 class LivenessEngineV0 : LivenessEngine {
     override fun evaluate(frameSequence: List<LivenessFrameSample>): LivenessResult {
-        val startedAtNanos = SystemClock.elapsedRealtimeNanos()
+        val startedAtNanos = System.nanoTime()
         return try {
             evaluateInternal(frameSequence)
         } finally {
@@ -20,8 +19,8 @@ class LivenessEngineV0 : LivenessEngine {
             return uncertain(0f, "Collecting live frame sequence")
         }
 
-        if (frameSequence.any { !it.faceDetectionResult.hasExactlyOneFace }) {
-            return failed("Multiple faces or missing face during liveness")
+        if (frameSequence.any { !it.faceDetectionResult.hasSelectedPrimaryFace }) {
+            return failed("Selected face disappeared during liveness")
         }
 
         if (frameSequence.any { !it.faceDetectionResult.quality.passes }) {
@@ -44,7 +43,7 @@ class LivenessEngineV0 : LivenessEngine {
         }
 
         val faceSamples = frameSequence.mapNotNull { sample ->
-            sample.faceDetectionResult.primaryFace?.let { face -> sample to face }
+            sample.faceDetectionResult.selectedPrimaryFace?.let { face -> sample to face }
         }
         if (faceSamples.size != frameSequence.size) {
             return failed("Face disappeared during liveness")

@@ -48,17 +48,13 @@ class LiveEnrollmentFrameProcessor(
             )
         }
 
-        if (!faceDetectionResult.hasExactlyOneFace) {
+        if (!faceDetectionResult.hasSelectedPrimaryFace) {
             recentLivenessSamples.clear()
             val tracking = stableFaceTracker.update(frameInfo, faceDetectionResult)
             return output(
                 state = LiveFramePipelineState.WAITING_FOR_FACE,
                 userMessage = faceDetectionResult.quality.guardMessage(),
-                recognitionDecision = if (faceDetectionResult.faceCount > 1) {
-                    RecognitionDecision.MULTIPLE_FACES
-                } else {
-                    RecognitionDecision.UNCERTAIN
-                },
+                recognitionDecision = RecognitionDecision.UNCERTAIN,
                 stableFaceTrackingResult = tracking,
                 faceDetectionResult = faceDetectionResult,
             )
@@ -195,7 +191,7 @@ class LiveEnrollmentFrameProcessor(
     }
 
     private fun sampleTargetMessage(faceDetectionResult: FaceDetectionResult): String? {
-        val yaw = faceDetectionResult.primaryFace?.headEulerAngleY ?: return "Center your face"
+        val yaw = faceDetectionResult.selectedPrimaryFace?.headEulerAngleY ?: return "Center your face"
         return when (capturedSampleCount) {
             0 -> if (abs(yaw) <= FrontYawDegrees) null else "Look straight for sample 1"
             1 -> if (abs(yaw) in SlightYawMinDegrees..SlightYawMaxDegrees) null else "Turn slightly left or right"
@@ -254,7 +250,7 @@ class LiveEnrollmentFrameProcessor(
     private fun com.schoollog.attendance.ml.face.FaceQualityResult.guardMessage(): String =
         when (failureReason) {
             FaceQualityFailureReason.NO_FACE -> "Waiting for student..."
-            FaceQualityFailureReason.MULTIPLE_FACES -> "Only one student at a time"
+            FaceQualityFailureReason.MULTIPLE_FACES -> "Multiple faces detected, using closest face"
             FaceQualityFailureReason.FACE_TOO_SMALL -> "Move closer"
             FaceQualityFailureReason.FACE_NOT_CENTERED,
             FaceQualityFailureReason.FACE_PARTIALLY_OUTSIDE_FRAME -> "Center your face"

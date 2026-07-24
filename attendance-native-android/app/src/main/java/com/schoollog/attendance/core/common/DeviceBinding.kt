@@ -12,4 +12,6 @@ data class DeviceBinding(
     val embeddingSyncVersion: Long,
     val registeredAtMillis: Long,
     val lastHeartbeatAtMillis: Long?,
+    val lastAttendanceSyncAtMillis: Long?,
+    val lastEmbeddingSyncAtMillis: Long?,
 )

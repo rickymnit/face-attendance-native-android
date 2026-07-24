@@ -27,6 +27,11 @@ export class DeviceHeartbeatDto {
 
   @IsInt()
   @Min(0)
+  @IsOptional()
+  embeddingCount?: number;
+
+  @IsInt()
+  @Min(0)
   pendingAttendanceCount!: number;
 
   @IsInt()
@@ -45,5 +50,30 @@ export class DeviceHeartbeatDto {
 
   @IsString()
   @IsOptional()
+  lastAttendanceSyncAt?: string;
+
+  @IsString()
+  @IsOptional()
+  lastEmbeddingSyncAt?: string;
+
+  @IsString()
+  @IsOptional()
+  networkStatus?: string;
+
+  @IsString()
+  @IsOptional()
   networkType?: string;
+
+  @IsString()
+  @IsOptional()
+  cameraStatus?: string;
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  averageDecisionTime?: number;
+
+  @IsString()
+  @IsOptional()
+  lastError?: string;
 }

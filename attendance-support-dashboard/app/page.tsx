@@ -200,6 +200,7 @@ function SchoolsHealth({ schools, onSelect }: { schools: SchoolHealth[]; onSelec
           <h2>{school.schoolName}</h2>
           <p className="muted">{school.schoolId}</p>
           <p><b>{school.onlineDevices}</b> online · <b>{school.offlineDevices}</b> offline</p>
+          <p><span className="status-pass">{school.healthyDevices}</span> healthy · <span className="status-warn">{school.warningDevices}</span> warning · <span className="status-fail">{school.criticalDevices}</span> critical</p>
           <p>Pending ERP sync: <b>{school.pendingErpSync}</b></p>
           <p>Failed recognitions today: <b>{school.failedRecognitionCount}</b></p>
           <p>Embedding sync version: <b>{school.embeddingSyncVersion}</b></p>
@@ -216,17 +217,22 @@ function DevicesList({ devices, offlineDevices, onOpenDevice }: { devices: Devic
       <h2>Devices</h2>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Status</th><th>Device</th><th>Gate</th><th>Heartbeat</th><th>App</th><th>Model</th><th>Pending</th><th></th></tr></thead>
+          <thead><tr><th>Status</th><th>Health</th><th>Device</th><th>Gate</th><th>Heartbeat</th><th>Battery</th><th>Network</th><th>Camera</th><th>Model</th><th>Embeddings</th><th>Pending</th><th>Decision</th><th></th></tr></thead>
           <tbody>
             {devices.map((device) => (
               <tr key={device.deviceId}>
                 <td className={device.online ? 'status-pass' : 'status-fail'}>{device.online ? 'ONLINE' : 'OFFLINE'}</td>
-                <td>{device.name}<br /><span className="muted">{device.deviceId}</span></td>
+                <td className={healthClass(device.healthStatus)}>{device.healthStatus}<br /><span className="muted">{device.healthReason}</span></td>
+                <td>{device.name}<br /><span className="muted">{device.deviceId}<br />App {device.appVersion || '--'}</span></td>
                 <td>{device.gateId}</td>
                 <td>{formatDate(device.lastHeartbeat)}</td>
-                <td>{device.appVersion || '--'}</td>
+                <td>{formatBattery(device.batteryPercent, device.isCharging)}</td>
+                <td>{device.networkStatus || '--'}</td>
+                <td>{device.cameraStatus || '--'}</td>
                 <td>{device.modelVersion || '--'}</td>
+                <td>{device.embeddingCount ?? '--'}</td>
                 <td>{device.pendingAttendanceSync ?? '--'}</td>
+                <td>{formatMillis(device.averageDecisionTime)}</td>
                 <td><button onClick={() => onOpenDevice(device.deviceId)}>Details</button></td>
               </tr>
             ))}
@@ -235,6 +241,7 @@ function DevicesList({ devices, offlineDevices, onOpenDevice }: { devices: Devic
       </div>
       <h3 style={{ marginTop: 16 }}>Offline Devices</h3>
       <p className="muted">{offlineDevices.length} offline device(s) across visible support scope.</p>
+      {offlineDevices.length > 0 && <div className="table-wrap"><table><thead><tr><th>School</th><th>Device</th><th>Gate</th><th>Last heartbeat</th><th>Health</th></tr></thead><tbody>{offlineDevices.map((device) => <tr key={device.deviceId}><td>{device.schoolName}<br /><span className="muted">{device.schoolId}</span></td><td>{device.name}<br /><span className="muted">{device.deviceId}</span></td><td>{device.gateId}</td><td>{formatDate(device.lastHeartbeat)}</td><td className={healthClass(device.healthStatus)}>{device.healthStatus}<br /><span className="muted">{device.healthReason}</span></td></tr>)}</tbody></table></div>}
     </section>
   );
 }
@@ -298,6 +305,22 @@ function DeviceDetailPanel({ deviceId, logs }: { deviceId: string; logs: DeviceL
 
 function Stat({ label, value, tone }: { label: string; value: number | string; tone?: 'pass' | 'warn' | 'fail' }) {
   return <article className="card"><h3>{label}</h3><p className={tone ? `status-${tone}` : undefined}>{value}</p></article>;
+}
+
+
+function healthClass(status: 'HEALTHY' | 'WARNING' | 'CRITICAL') {
+  if (status === 'HEALTHY') return 'status-pass';
+  if (status === 'WARNING') return 'status-warn';
+  return 'status-fail';
+}
+
+function formatBattery(percent: number | null | undefined, isCharging: boolean | null | undefined) {
+  if (typeof percent !== 'number') return '--';
+  return `${percent}%${isCharging ? ' charging' : ''}`;
+}
+
+function formatMillis(value: number | null | undefined) {
+  return typeof value === 'number' ? `${value.toFixed(0)} ms` : '--';
 }
 
 function formatDate(value: string | null | undefined) {

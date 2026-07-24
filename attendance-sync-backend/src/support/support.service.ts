@@ -9,10 +9,11 @@ export class SupportService {
   async schoolsHealth() {
     const schools = await this.prisma.school.findMany({
       orderBy: { name: 'asc' },
-      include: { devices: true },
+      include: { devices: { include: { health: true } } },
     });
     return Promise.all(schools.map(async (school) => {
       const onlineDevices = school.devices.filter((device) => this.isOnline(device.lastHeartbeatAt)).length;
+      const deviceHealthStatuses = school.devices.map((device) => this.healthForDevice(device));
       const [pendingErpSync, failedRecognitionCount] = await Promise.all([
         this.prisma.erpSyncStatus.count({ where: { schoolId: school.id, status: { in: [ErpSyncState.PENDING, ErpSyncState.FAILED] } } }),
         this.prisma.failedRecognitionLog.count({ where: { schoolId: school.id, timestamp: { gte: this.todayUtc() } } }),
@@ -26,28 +27,46 @@ export class SupportService {
         pendingErpSync,
         failedRecognitionCount,
         embeddingSyncVersion: school.embeddingSyncVersion,
+        healthyDevices: deviceHealthStatuses.filter((health) => health.status === 'HEALTHY').length,
+        warningDevices: deviceHealthStatuses.filter((health) => health.status === 'WARNING').length,
+        criticalDevices: deviceHealthStatuses.filter((health) => health.status === 'CRITICAL').length,
       };
     }));
   }
 
   async devicesForSchool(schoolId: string) {
-    const devices = await this.prisma.device.findMany({ where: { schoolId }, orderBy: { gateId: 'asc' } });
-    return Promise.all(devices.map(async (device) => {
-      const latestHeartbeat = await this.latestAuditMetadata(schoolId, device.id, AuditAction.DEVICE_HEARTBEAT);
+    const devices = await this.prisma.device.findMany({
+      where: { schoolId },
+      include: { health: true },
+      orderBy: { gateId: 'asc' },
+    });
+    return devices.map((device) => {
+      const health = this.healthForDevice(device);
       return {
         deviceId: device.id,
         gateId: device.gateId,
         name: device.name,
         status: device.status,
         online: this.isOnline(device.lastHeartbeatAt),
+        healthStatus: health.status,
+        healthReason: health.reason,
         lastHeartbeat: device.lastHeartbeatAt?.toISOString() ?? null,
-        appVersion: device.appVersion,
-        modelVersion: latestHeartbeat?.modelVersion ?? null,
-        pendingAttendanceSync: latestHeartbeat?.pendingAttendanceCount ?? null,
-        pendingFailedRecognitionSync: latestHeartbeat?.pendingFailedRecognitionCount ?? null,
+        appVersion: device.health?.appVersion ?? device.appVersion,
+        modelVersion: device.health?.modelVersion ?? null,
+        embeddingCount: device.health?.embeddingCount ?? null,
+        pendingAttendanceSync: device.health?.pendingAttendanceCount ?? null,
+        pendingFailedRecognitionSync: device.health?.pendingFailedRecognitionCount ?? null,
+        lastAttendanceSyncAt: device.health?.lastAttendanceSyncAt?.toISOString() ?? null,
+        lastEmbeddingSyncAt: device.health?.lastEmbeddingSyncAt?.toISOString() ?? null,
+        batteryPercent: device.health?.batteryPercent ?? null,
+        isCharging: device.health?.isCharging ?? null,
+        networkStatus: device.health?.networkStatus ?? null,
+        cameraStatus: device.health?.cameraStatus ?? null,
+        averageDecisionTime: device.health?.averageDecisionTime ?? null,
+        lastError: device.health?.lastError ?? null,
         embeddingSyncVersion: device.embeddingSyncVersion,
       };
-    }));
+    });
   }
 
   async todaySummary(schoolId: string) {
@@ -125,7 +144,7 @@ export class SupportService {
     const cutoff = new Date(Date.now() - 30 * 60 * 1000);
     const devices = await this.prisma.device.findMany({
       where: { OR: [{ lastHeartbeatAt: null }, { lastHeartbeatAt: { lt: cutoff } }] },
-      include: { school: true },
+      include: { school: true, health: true },
       orderBy: { lastHeartbeatAt: 'asc' },
       take: 200,
     });
@@ -136,7 +155,9 @@ export class SupportService {
       gateId: device.gateId,
       name: device.name,
       lastHeartbeat: device.lastHeartbeatAt?.toISOString() ?? null,
-      appVersion: device.appVersion,
+      appVersion: device.health?.appVersion ?? device.appVersion,
+      healthStatus: this.healthForDevice(device).status,
+      healthReason: this.healthForDevice(device).reason,
     }));
   }
 
@@ -162,6 +183,48 @@ export class SupportService {
         createdAt: log.createdAt.toISOString(),
       })),
     };
+  }
+
+  private healthForDevice(device: { lastHeartbeatAt: Date | null; health?: any }): { status: 'HEALTHY' | 'WARNING' | 'CRITICAL'; reason: string } {
+    if (!this.isOnline(device.lastHeartbeatAt)) {
+      return { status: 'CRITICAL', reason: 'Device is offline or heartbeat is stale' };
+    }
+
+    const health = device.health;
+    if (!health) {
+      return { status: 'WARNING', reason: 'No health telemetry received yet' };
+    }
+
+    if (health.lastError) {
+      return { status: 'CRITICAL', reason: `Last device error: ${health.lastError}` };
+    }
+
+    if (health.networkStatus === 'OFFLINE') {
+      return { status: 'CRITICAL', reason: 'Device reports offline network status' };
+    }
+
+    if (typeof health.batteryPercent === 'number' && health.batteryPercent <= 15 && health.isCharging === false) {
+      return { status: 'CRITICAL', reason: 'Battery low and charger is disconnected' };
+    }
+
+    if ((health.pendingAttendanceCount ?? 0) >= 100) {
+      return { status: 'WARNING', reason: 'Large pending attendance sync queue' };
+    }
+
+    if ((health.embeddingCount ?? 0) <= 0) {
+      return { status: 'WARNING', reason: 'No active embeddings loaded on device' };
+    }
+
+    if (typeof health.averageDecisionTime === 'number' && health.averageDecisionTime > 3000) {
+      return { status: 'WARNING', reason: 'Average decision time is above 3 seconds' };
+    }
+
+    const cameraStatus = String(health.cameraStatus ?? '').toLowerCase();
+    if (cameraStatus.includes('unavailable') || cameraStatus.includes('error')) {
+      return { status: 'CRITICAL', reason: `Camera status: ${health.cameraStatus}` };
+    }
+
+    return { status: 'HEALTHY', reason: 'Heartbeat and telemetry are within expected limits' };
   }
 
   private isOnline(lastHeartbeatAt: Date | null): boolean {

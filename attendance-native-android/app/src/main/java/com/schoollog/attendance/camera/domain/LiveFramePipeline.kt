@@ -40,17 +40,13 @@ class LiveFramePipeline(
     ): LiveFramePipelineOutput {
         processedFrameCount += 1
 
-        if (!faceDetectionResult.hasExactlyOneFace) {
+        if (!faceDetectionResult.hasSelectedPrimaryFace) {
             recentLivenessSamples.clear()
             val stableFaceTracking = updateStableFaceTracker(frameInfo, faceDetectionResult)
             return output(
                 state = LiveFramePipelineState.WAITING_FOR_FACE,
                 userMessage = faceDetectionResult.quality.guardMessage(),
-                recognitionDecision = if (faceDetectionResult.faceCount > 1) {
-                    RecognitionDecision.MULTIPLE_FACES
-                } else {
-                    RecognitionDecision.UNCERTAIN
-                },
+                recognitionDecision = RecognitionDecision.UNCERTAIN,
                 stableFaceTrackingResult = stableFaceTracking,
                 faceDetectionResult = faceDetectionResult,
             )
@@ -162,7 +158,7 @@ class LiveFramePipeline(
         }
         PerformanceMonitor.recordMatchResult(match)
 
-        val allGatesPassed = faceDetectionResult.hasExactlyOneFace &&
+        val allGatesPassed = faceDetectionResult.hasSelectedPrimaryFace &&
             faceDetectionResult.quality.passes &&
             stableFaceTracking.isReadyForLiveness &&
             liveness.passes &&
@@ -211,7 +207,7 @@ class LiveFramePipeline(
     private fun com.schoollog.attendance.ml.face.FaceQualityResult.guardMessage(): String =
         when (failureReason) {
             FaceQualityFailureReason.NO_FACE -> "Waiting for student..."
-            FaceQualityFailureReason.MULTIPLE_FACES -> "Only one student at a time"
+            FaceQualityFailureReason.MULTIPLE_FACES -> "Multiple faces detected, using closest face"
             FaceQualityFailureReason.FACE_TOO_SMALL -> "Move closer"
             FaceQualityFailureReason.FACE_NOT_CENTERED,
             FaceQualityFailureReason.FACE_PARTIALLY_OUTSIDE_FRAME -> "Center your face"

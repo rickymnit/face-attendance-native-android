@@ -96,28 +96,28 @@ class GateAttendanceViewModel(
     private fun nextEventForCurrentState(output: LiveFramePipelineOutput): GateModeEvent {
         val state = stateMachine.currentState
         val detection = output.faceDetectionResult
-        val hasExactlyOneFace = detection?.hasExactlyOneFace == true
+        val hasSelectedFace = detection?.hasSelectedPrimaryFace == true
         val qualityPassed = detection?.quality?.passes == true
         val stableReady = output.stableFaceTrackingResult?.isReadyForLiveness == true
 
         return when (state) {
             GateModeState.IdleWaitingForFace -> {
-                if (hasExactlyOneFace) GateModeEvent.FaceDetected else GateModeEvent.FrameReceived
+                if (hasSelectedFace) GateModeEvent.FaceDetected else GateModeEvent.FrameReceived
             }
             GateModeState.FaceDetected,
             GateModeState.FaceQualityChecking -> when {
-                !hasExactlyOneFace -> GateModeEvent.ResetForNextStudent
+                !hasSelectedFace -> GateModeEvent.ResetForNextStudent
                 !qualityPassed -> GateModeEvent.FaceQualityFailed(detection?.quality?.reason ?: "Face quality failed")
                 else -> GateModeEvent.FaceQualityPassed
             }
             GateModeState.HoldStill -> when {
-                !hasExactlyOneFace -> GateModeEvent.ResetForNextStudent
+                !hasSelectedFace -> GateModeEvent.ResetForNextStudent
                 !qualityPassed -> GateModeEvent.FaceQualityFailed(detection?.quality?.reason ?: "Face quality failed")
                 stableReady -> GateModeEvent.FaceStable
                 else -> GateModeEvent.FrameReceived
             }
             GateModeState.CheckingLiveness -> when {
-                !hasExactlyOneFace -> GateModeEvent.LivenessFailed("Face lost during liveness. Please try again")
+                !hasSelectedFace -> GateModeEvent.LivenessFailed("Selected face lost during liveness. Please try again")
                 !qualityPassed -> GateModeEvent.LivenessFailed("Face quality failed during liveness. Please try again")
                 output.livenessResult?.decision == LivenessDecision.PASS -> GateModeEvent.LivenessPassed
                 output.livenessResult?.decision == LivenessDecision.FAIL -> {
